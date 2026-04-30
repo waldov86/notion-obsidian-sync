@@ -1,0 +1,23 @@
+{
+  "_comment": "Copy this file to config.json and fill in your values. All fields are optional — environment variables take priority over this file.",
+
+  "dbId": "YOUR_NOTION_DATABASE_ID",
+
+  "localRoot": "/Users/you/notes/todos",
+  "archiveDir": "/Users/you/notes/todos/.archive",
+  "kanbanPath": "/Users/you/notes/kanban.md",
+
+  "statePath": "/Users/you/.config/notion-obsidian-sync/state.json",
+  "logPath":   "/Users/you/.config/notion-obsidian-sync/sync.log",
+  "lockPath":  "/tmp/notion-obsidian-sync.lock",
+
+  "tokenPath": "/Users/you/.config/notion/token",
+
+  "pollIntervalMs": 300000,
+  "triggerPort": 9876,
+
+  "validStatuses":   ["Backlog", "In progress", "Done"],
+  "validHorizons":   ["Now", "Later", ""],
+  "validOutcomes":   ["Completed", "Dropped", ""],
+  "validCategories": []
+}

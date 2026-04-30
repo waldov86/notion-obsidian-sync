@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS launchd agent for notion-obsidian-sync.
+  1. Copy to ~/Library/LaunchAgents/com.yourname.notion-obsidian-sync.plist
+  2. Edit the paths below to match your setup
+  3. launchctl load ~/Library/LaunchAgents/com.yourname.notion-obsidian-sync.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.yourname.notion-obsidian-sync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/path/to/notion-obsidian-sync/index.js</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NOTION_TOKEN</key>
+    <string>secret_YOUR_NOTION_INTEGRATION_TOKEN</string>
+    <key>NOTION_DB_ID</key>
+    <string>YOUR_DATABASE_ID</string>
+    <key>LOCAL_ROOT</key>
+    <string>/Users/you/notes/todos</string>
+    <key>KANBAN_PATH</key>
+    <string>/Users/you/notes/kanban.md</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/notion-obsidian-sync.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/notion-obsidian-sync.log</string>
+</dict>
+</plist>

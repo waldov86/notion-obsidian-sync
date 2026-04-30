@@ -1,0 +1,24 @@
+[Unit]
+Description=notion-obsidian-sync daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /path/to/notion-obsidian-sync/index.js
+Restart=always
+RestartSec=10
+
+# Set your credentials here or via EnvironmentFile
+Environment=NOTION_TOKEN=secret_YOUR_NOTION_INTEGRATION_TOKEN
+Environment=NOTION_DB_ID=YOUR_DATABASE_ID
+Environment=LOCAL_ROOT=/home/you/notes/todos
+Environment=KANBAN_PATH=/home/you/notes/kanban.md
+
+# Optional: load from a file instead (recommended for tokens)
+# EnvironmentFile=/etc/notion-obsidian-sync.env
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
