@@ -53,6 +53,7 @@ function debounce(key, fn, ms = 500) {
 // ── State ─────────────────────────────────────────────────────────────────────
 let state;
 let lastDoneTitles = [];
+let isFirstPoll = true;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function absPath(relPath) { return path.join(config.LOCAL_ROOT, relPath); }
@@ -474,6 +475,15 @@ async function poll() {
       if (entry.remote_last_edited === fields.remoteLastEdited) continue;
       if (isSuppressed(entry.path)) continue;
 
+      // Item may have been archived and re-entered scope (e.g. status restored)
+      if (!entry.path) {
+        const relPath = toFilename(notionId, fields.title, existingPaths());
+        if (DRY_RUN) { console.log(`[DRY-RUN] re-pull archived item ${relPath} "${fields.title}"`); continue; }
+        stateLib.setEntry(state, notionId, { sync_status: 'clean' });
+        await pullItem(notionId, fields, relPath);
+        continue;
+      }
+
       const abs = absPath(entry.path);
       if (fs.existsSync(abs)) {
         const parsed = parseFile(fs.readFileSync(abs, 'utf8'));
@@ -499,6 +509,8 @@ async function poll() {
     }
   }
 
+  if (!isFirstPoll) await syncKanbanToNotion();
+  isFirstPoll = false;
   suppress('__kanban__');
   rebuildKanban(state, lastDoneTitles);
   log.info('Poll done', { remoteCount: remoteItems.length });
