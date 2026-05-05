@@ -16,6 +16,9 @@ Notion database  ←→  ~/notes/todos/*.md  →  kanban.md (Obsidian board)
 - **Push**: edits to `.md` files (title, status, body) sync back to Notion within 500 ms
 - **Create**: drop a new `.md` file in the folder → a Notion page is created automatically
 - **Kanban board**: `kanban.md` is rebuilt after every sync — `[[wikilink]]` cards grouped by Status, sortable by Horizon
+- **Instant Notion→Local**: HTTP trigger endpoint + Cloudflare Tunnel lets webhook integrations (n8n, Zapier) force an immediate poll on Notion changes
+- **Dead-letter journal**: failed syncs are tracked in a local SQLite database; `node deadletter.js --status` shows stuck files
+- **Heartbeat alerts**: if the daemon goes silent for 30+ minutes, a Telegram message is sent (credentials via macOS Keychain or env vars)
 
 ### Safety guards (learned from a 28-task wipeout)
 
@@ -25,7 +28,9 @@ Two hard limits protect against bulk data loss:
 
 2. **Catastrophic-drop guard** — if removing items from the kanban would affect more than 5 items *and* more than 50% of the active board in a single pass, the drop is aborted. Status changes and new cards still go through; only the mass-drop is blocked.
 
-Both guards log a `SAFETY:` warn entry so you know what happened.
+3. **Concurrency guard** — a `pollInFlight` flag prevents the scheduled poll and the HTTP trigger from running simultaneously. Whichever call arrives second skips and logs a line.
+
+All guards log a `SAFETY:` warn entry so you know what happened.
 
 ---
 
@@ -153,10 +158,24 @@ Both cases are logged at `warn` level.
 The daemon runs a local HTTP server on port 9876 (configurable via `TRIGGER_PORT`). Send a `POST /trigger-poll` to kick off an immediate poll without waiting for the interval:
 
 ```bash
-curl -X POST http://localhost:9876/trigger-poll
+curl -X POST http://127.0.0.1:9876/trigger-poll
 ```
 
-Useful for webhook integrations — expose with [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or similar and trigger from n8n, Zapier, etc.
+Use this to make Notion→Local sync effectively instant. The pattern that works:
+
+1. Expose the endpoint externally with [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (or similar)
+2. Register a Notion webhook pointing at your n8n/Zapier/Make instance
+3. Have the automation POST to your tunnel URL on every Notion change
+
+The daemon uses `127.0.0.1` (not `localhost`) — make sure your curl command and automation use the right host.
+
+A concurrency guard ensures that if a triggered poll arrives while the scheduled poll is already running, it skips rather than stacking. So rapid-fire Notion events are safe.
+
+### Useful alias
+
+```bash
+alias sync-now='curl -s -X POST http://127.0.0.1:9876/trigger-poll && echo "sync triggered"'
+```
 
 ---
 

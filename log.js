@@ -21,7 +21,7 @@ function rotateLogs() {
 function write(level, msg, meta = {}) {
   rotateLogs();
   const entry = { ts: new Date().toISOString(), level, msg, ...meta };
-  const line  = JSON.stringify(entry) + '\n';
+  const line = JSON.stringify(entry) + '\n';
   try {
     fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
     fs.appendFileSync(LOG_PATH, line);

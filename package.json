@@ -1,20 +1,22 @@
 {
-  "name": "notion-obsidian-sync",
+  "name": "todos-notion-sync",
   "version": "1.0.0",
-  "description": "Reliable two-way sync between a Notion database and local Markdown files, with an Obsidian kanban board output",
+  "description": "Notion Todos database <-> local todos/ folder sync",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dry-run": "node index.js --dry-run"
+    "dry-run": "node index.js --dry-run",
+    "test": "jest"
   },
-  "keywords": ["notion", "obsidian", "sync", "markdown", "kanban", "productivity"],
-  "license": "MIT",
   "dependencies": {
     "@notionhq/client": "^5.20.0",
     "@tryfabric/martian": "^1.2.4",
     "chokidar": "^5.0.0",
     "notion-to-md": "^3.1.9",
     "proper-lockfile": "^4.1.2"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0"
   }
 }

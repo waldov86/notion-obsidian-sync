@@ -9,8 +9,9 @@ function loadState() {
     return { pages_by_id: {}, path_index: {} };
   }
   try {
-    const raw    = fs.readFileSync(STATE_PATH, 'utf8');
+    const raw = fs.readFileSync(STATE_PATH, 'utf8');
     const parsed = JSON.parse(raw);
+    // Rebuild path_index from pages_by_id (authoritative)
     parsed.path_index = {};
     for (const [id, entry] of Object.entries(parsed.pages_by_id || {})) {
       if (entry.path) parsed.path_index[entry.path] = id;
@@ -31,21 +32,28 @@ function saveState(state) {
   const tmp = STATE_PATH + '.tmp';
   fs.mkdirSync(path.dirname(STATE_PATH), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  // Keep a rolling backup of the last known-good state for manual recovery
   if (fs.existsSync(STATE_PATH)) fs.copyFileSync(STATE_PATH, STATE_PATH + '.bak');
-  fs.renameSync(tmp, STATE_PATH);
+  fs.renameSync(tmp, STATE_PATH); // atomic on POSIX
 }
 
 function hashContent(content) {
   return 'sha256:' + crypto.createHash('sha256').update(content).digest('hex');
 }
 
+// Hash all sync-relevant content: title + status + horizon + outcome + categories + body
 function hashFields({ title, status, horizon, outcome = '', categories = [], body = '' }) {
   const cats = [...categories].sort().join(',');
   return hashContent(`${title}|${status}|${horizon || ''}|${outcome || ''}|${cats}|${body.trim()}`);
 }
 
-function getEntryById(state, id)    { return state.pages_by_id[id] || null; }
-function getIdByPath(state, relPath) { return state.path_index[relPath] || null; }
+function getEntryById(state, id) {
+  return state.pages_by_id[id] || null;
+}
+
+function getIdByPath(state, relPath) {
+  return state.path_index[relPath] || null;
+}
 
 function setEntry(state, id, fields) {
   state.pages_by_id[id] = { ...(state.pages_by_id[id] || {}), ...fields };
