@@ -43,6 +43,10 @@ const WIKILINK_PREFIX = c('WIKILINK_PREFIX', 'wikilinkPrefix', 'AI-projects-pers
 // First-column label in the kanban board (the "not started" column)
 const BACKLOG_COLUMN_LABEL = c('BACKLOG_COLUMN_LABEL', 'backlogColumnLabel', '📥 Backlog');
 
+// Obsidian kanban plugin settings JSON — controls which metadata fields show as card labels
+const KANBAN_SETTINGS = fileConfig.kanbanSettings ||
+  '{"kanban-plugin":"board","metadata-keys":[{"metadataKey":"category","label":"","shouldHideLabel":true,"containsMarkdown":false}]}';
+
 // Optional property flags — set false in config.json if the Notion DB doesn't have these fields
 function bool(envKey, jsonKey, fallback) {
   const raw = c(envKey, jsonKey, null);
@@ -77,7 +81,7 @@ const IN_SCOPE_STATUSES = new Set(
 module.exports = {
   LOCAL_ROOT, ARCHIVE_DIR, TOKEN_PATH, STATE_PATH, LOG_PATH, LOCK_PATH, KANBAN_PATH,
   DB_ID, DATA_SOURCE_ID, POLL_INTERVAL_MS, TRIGGER_PORT,
-  TITLE_PROPERTY, WIKILINK_PREFIX, BACKLOG_COLUMN_LABEL,
+  TITLE_PROPERTY, WIKILINK_PREFIX, BACKLOG_COLUMN_LABEL, KANBAN_SETTINGS,
   HAS_HORIZON, HAS_OUTCOME, HAS_CATEGORY, IN_SCOPE_STATUSES,
   VALID_STATUSES, VALID_HORIZONS, VALID_OUTCOMES, VALID_CATEGORIES,
   STATUS_ALIASES, HORIZON_ALIASES, OUTCOME_ALIASES, CATEGORY_ALIASES,

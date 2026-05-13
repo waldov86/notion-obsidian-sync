@@ -1,7 +1,7 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-const { KANBAN_PATH, WIKILINK_PREFIX, BACKLOG_COLUMN_LABEL, IN_SCOPE_STATUSES } = require('./config');
+const { KANBAN_PATH, WIKILINK_PREFIX, BACKLOG_COLUMN_LABEL, KANBAN_SETTINGS, IN_SCOPE_STATUSES } = require('./config');
 const log = require('./log');
 
 // Horizon rank for ordering: Now=0, Later=1, anything else=2
@@ -60,7 +60,7 @@ function rebuildKanban(state, doneTitles = []) {
     '',
     '%% kanban:settings',
     '```',
-    '{"kanban-plugin":"board","metadata-keys":[{"metadataKey":"category","label":"","shouldHideLabel":true,"containsMarkdown":false}]}',
+    KANBAN_SETTINGS,
     '```',
     '%%',
     '',
