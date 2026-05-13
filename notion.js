@@ -3,7 +3,10 @@ const fs    = require('fs');
 const https = require('https');
 const { Client } = require('@notionhq/client');
 const { NotionToMarkdown } = require('notion-to-md');
-const { TOKEN_PATH, DB_ID, DATA_SOURCE_ID } = require('./config');
+const {
+  TOKEN_PATH, DB_ID, DATA_SOURCE_ID,
+  TITLE_PROPERTY, HAS_HORIZON, HAS_OUTCOME, HAS_CATEGORY, IN_SCOPE_STATUSES,
+} = require('./config');
 const log = require('./log');
 
 let token;
@@ -11,7 +14,7 @@ let notionClient;
 let n2m;
 
 function initNotion() {
-  token = fs.readFileSync(TOKEN_PATH, 'utf8').trim();
+  token = process.env.NOTION_TOKEN || fs.readFileSync(TOKEN_PATH, 'utf8').trim();
   notionClient = new Client({ auth: token });
   n2m = new NotionToMarkdown({ notionClient });
 }
@@ -59,7 +62,7 @@ async function validateSchema() {
   const props = db.properties || {};
   if (Object.keys(props).length > 0) {
     if (!props.Status) throw new Error('Notion DB missing "Status" property');
-    if (!props.Horizon) throw new Error('Notion DB missing "Horizon" property');
+    if (HAS_HORIZON && !props.Horizon) throw new Error('Notion DB missing "Horizon" property');
     log.info('Schema valid', { statusType: props.Status?.type, horizonType: props.Horizon?.type });
   } else {
     // Newer API format — properties not returned in retrieve; do a test query to validate
@@ -84,10 +87,7 @@ async function queryInScopeItems() {
     const body = {
       page_size: 100,
       filter: {
-        or: [
-          { property: 'Status', status: { equals: 'Backlog' } },
-          { property: 'Status', status: { equals: 'In progress' } },
-        ],
+        or: [...IN_SCOPE_STATUSES].map(s => ({ property: 'Status', status: { equals: s } })),
       },
     };
     if (cursor) body.start_cursor = cursor;
@@ -114,12 +114,12 @@ async function queryDoneItems(limit = 10) {
 
 // Extract sync-relevant fields from a Notion page object
 function extractFields(page) {
-  const titleParts = page.properties.Name?.title || [];
+  const titleParts = page.properties[TITLE_PROPERTY]?.title || [];
   const title      = titleParts.map(t => t.plain_text).join('').trim() || 'Untitled';
   const status     = page.properties.Status?.status?.name  || '';
-  const horizon    = page.properties.Horizon?.select?.name || '';
-  const outcome    = page.properties.Outcome?.select?.name || '';
-  const categories = (page.properties.Category?.multi_select || []).map(o => o.name);
+  const horizon    = HAS_HORIZON  ? (page.properties.Horizon?.select?.name  || '') : '';
+  const outcome    = HAS_OUTCOME  ? (page.properties.Outcome?.select?.name  || '') : '';
+  const categories = HAS_CATEGORY ? (page.properties.Category?.multi_select || []).map(o => o.name) : [];
   return { title, status, horizon, outcome, categories, remoteLastEdited: page.last_edited_time };
 }
 
@@ -129,18 +129,18 @@ async function updatePageFields(pageId, { title, status, horizon, outcome, categ
   const properties = {};
 
   if (title !== undefined) {
-    properties.Name = { title: [{ type: 'text', text: { content: title } }] };
+    properties[TITLE_PROPERTY] = { title: [{ type: 'text', text: { content: title } }] };
   }
   if (status !== undefined) {
     properties.Status = { status: { name: status } };
   }
-  if (horizon !== undefined) {
+  if (HAS_HORIZON && horizon !== undefined) {
     properties.Horizon = horizon ? { select: { name: horizon } } : { select: null };
   }
-  if (outcome !== undefined) {
+  if (HAS_OUTCOME && outcome !== undefined) {
     properties.Outcome = outcome ? { select: { name: outcome } } : { select: null };
   }
-  if (categories !== undefined) {
+  if (HAS_CATEGORY && categories !== undefined) {
     properties.Category = { multi_select: categories.map(name => ({ name })) };
   }
 
@@ -190,12 +190,12 @@ async function updatePageBody(pageId, blocks) {
 // Create a new page in the Notion DB; returns the new page object
 async function createPage({ title, status = 'Backlog', horizon = 'Now', outcome = '', categories = [], body = '' }) {
   const properties = {
-    Name:   { title: [{ type: 'text', text: { content: title } }] },
-    Status: { status: { name: status } },
+    [TITLE_PROPERTY]: { title: [{ type: 'text', text: { content: title } }] },
+    Status:           { status: { name: status } },
   };
-  if (horizon)    properties.Horizon  = { select: { name: horizon } };
-  if (outcome)    properties.Outcome  = { select: { name: outcome } };
-  if (categories?.length) {
+  if (HAS_HORIZON  && horizon)          properties.Horizon  = { select: { name: horizon } };
+  if (HAS_OUTCOME  && outcome)          properties.Outcome  = { select: { name: outcome } };
+  if (HAS_CATEGORY && categories?.length) {
     properties.Category = { multi_select: categories.map(name => ({ name })) };
   }
 

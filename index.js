@@ -356,7 +356,9 @@ async function pushLocal(relPath) {
 }
 
 // ── Parse kanban.md and push status changes to Notion ────────────────────────
-async function syncKanbanToNotion() {
+// skipIds: Set of notion IDs pulled for the first time this poll cycle — exclude
+// from drop detection since the kanban hasn't been rebuilt to include them yet.
+async function syncKanbanToNotion(skipIds = new Set()) {
   if (!fs.existsSync(config.KANBAN_PATH)) return;
   const raw = fs.readFileSync(config.KANBAN_PATH, 'utf8');
 
@@ -440,6 +442,7 @@ async function syncKanbanToNotion() {
     if (entry.sync_status === 'archived') continue;
     if (entry.status !== 'Backlog' && entry.status !== 'In progress') continue;
     if (!entry.path) continue;
+    if (skipIds.has(id)) continue; // newly pulled this cycle — kanban not rebuilt yet
     const filename = path.basename(entry.path);
     if (!kanbanFilenames.has(filename)) {
       dropActions.push({ notionId: id, relPath: entry.path, entry });
@@ -598,6 +601,7 @@ async function _poll() {
   }
 
   // Process each in-scope item
+  const newlyPulledIds = new Set(); // IDs seen for the first time this poll cycle
   for (const page of remoteItems) {
     const notionId = page.id;
     const fields   = notion.extractFields(page);
@@ -608,6 +612,7 @@ async function _poll() {
       const relPath = toFilename(notionId, fields.title, existingPaths());
       if (DRY_RUN) { console.log(`[DRY-RUN] create ${relPath} "${fields.title}"`); continue; }
       await pullItem(notionId, fields, relPath);
+      newlyPulledIds.add(notionId);
     } else {
       // Known item — check if remote changed since last sync
       if (entry.remote_last_edited === fields.remoteLastEdited) continue;
@@ -619,6 +624,7 @@ async function _poll() {
         if (DRY_RUN) { console.log(`[DRY-RUN] re-pull archived item ${relPath} "${fields.title}"`); continue; }
         stateLib.setEntry(state, notionId, { sync_status: 'clean' });
         await pullItem(notionId, fields, relPath);
+        newlyPulledIds.add(notionId);
         continue;
       }
 
@@ -651,7 +657,7 @@ async function _poll() {
     }
   }
 
-  if (!isFirstPoll) await syncKanbanToNotion();
+  if (!isFirstPoll) await syncKanbanToNotion(newlyPulledIds);
   isFirstPoll = false;
   suppress('__kanban__');
   rebuildKanban(state, lastDoneTitles);
@@ -838,7 +844,7 @@ async function main() {
       res.writeHead(404); res.end();
     }
   });
-  triggerServer.listen(9876, '127.0.0.1', () => log.info('Trigger server listening on 127.0.0.1:9876'));
+  triggerServer.listen(config.TRIGGER_PORT, '127.0.0.1', () => log.info(`Trigger server listening on 127.0.0.1:${config.TRIGGER_PORT}`));
 }
 
 main().catch(err => {

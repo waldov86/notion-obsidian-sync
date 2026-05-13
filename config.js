@@ -20,8 +20,8 @@ function c(envKey, jsonKey, fallback) {
 
 const pathOf = (...parts) => path.join(os.homedir(), ...parts);
 
-const LOCAL_ROOT  = c('LOCAL_ROOT',               'localRoot',    pathOf('notes/todos'));
-const ARCHIVE_DIR = c('ARCHIVE_DIR',              'archiveDir',   pathOf('notes/todos/.archive'));
+const LOCAL_ROOT  = c('LOCAL_ROOT',               'localRoot',    pathOf('Documents/AI-projects-personal/todos'));
+const ARCHIVE_DIR = c('ARCHIVE_DIR',              'archiveDir',   pathOf('Documents/AI-projects-personal/todos/.archive'));
 const TOKEN_PATH  = c('NOTION_TOKEN_PATH',        'tokenPath',    pathOf('.config/notion/token'));
 const STATE_PATH  = c('STATE_PATH',               'statePath',    pathOf('.config/notion/todos_sync_state.json'));
 const LOG_PATH    = c('LOG_PATH',                 'logPath',      pathOf('Library/Logs/todos-notion-sync.log'));
@@ -32,6 +32,27 @@ const DATA_SOURCE_ID = c('NOTION_DATA_SOURCE_ID', 'dataSourceId', '');
 
 const POLL_INTERVAL_MS = parseInt(c('POLL_INTERVAL_MS', 'pollIntervalMs', 5 * 60 * 1000), 10);
 const TRIGGER_PORT     = parseInt(c('TRIGGER_PORT',     'triggerPort',    9876),            10);
+
+// Title property name — 'Name' for personal todos, 'Task name' for Faust AI Tasks Tracker
+const TITLE_PROPERTY = c('TITLE_PROPERTY', 'titleProperty', 'Name');
+
+// Wikilink prefix used in kanban.md — relative path from vault root to the todos folder
+// e.g. 'AI-projects-personal/todos' or 'Faust AI/todos'
+const WIKILINK_PREFIX = c('WIKILINK_PREFIX', 'wikilinkPrefix', 'AI-projects-personal/todos');
+
+// First-column label in the kanban board (the "not started" column)
+const BACKLOG_COLUMN_LABEL = c('BACKLOG_COLUMN_LABEL', 'backlogColumnLabel', '📥 Backlog');
+
+// Optional property flags — set false in config.json if the Notion DB doesn't have these fields
+function bool(envKey, jsonKey, fallback) {
+  const raw = c(envKey, jsonKey, null);
+  if (raw === null) return fallback;
+  if (typeof raw === 'boolean') return raw;
+  return raw !== 'false' && raw !== '0';
+}
+const HAS_HORIZON  = bool('HAS_HORIZON',  'hasHorizon',  true);
+const HAS_OUTCOME  = bool('HAS_OUTCOME',  'hasOutcome',  true);
+const HAS_CATEGORY = bool('HAS_CATEGORY', 'hasCategory', true);
 
 // Enum validation — configurable, with sensible defaults
 const VALID_STATUSES   = new Set(fileConfig.validStatuses   || ['Backlog', 'In progress', 'Done']);
@@ -48,9 +69,16 @@ const HORIZON_ALIASES  = buildAliasMap(VALID_HORIZONS);
 const OUTCOME_ALIASES  = buildAliasMap(VALID_OUTCOMES);
 const CATEGORY_ALIASES = buildAliasMap(VALID_CATEGORIES);
 
+// In-scope statuses for Notion query (everything except Done by default)
+const IN_SCOPE_STATUSES = new Set(
+  fileConfig.inScopeStatuses || [...VALID_STATUSES].filter(s => s !== 'Done')
+);
+
 module.exports = {
   LOCAL_ROOT, ARCHIVE_DIR, TOKEN_PATH, STATE_PATH, LOG_PATH, LOCK_PATH, KANBAN_PATH,
   DB_ID, DATA_SOURCE_ID, POLL_INTERVAL_MS, TRIGGER_PORT,
+  TITLE_PROPERTY, WIKILINK_PREFIX, BACKLOG_COLUMN_LABEL,
+  HAS_HORIZON, HAS_OUTCOME, HAS_CATEGORY, IN_SCOPE_STATUSES,
   VALID_STATUSES, VALID_HORIZONS, VALID_OUTCOMES, VALID_CATEGORIES,
   STATUS_ALIASES, HORIZON_ALIASES, OUTCOME_ALIASES, CATEGORY_ALIASES,
 };
