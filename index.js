@@ -230,7 +230,7 @@ async function pullItem(notionId, fields, relPath) {
     log.info('pullItem skipped: file suppressed by createLocal in flight', { relPath, notionId });
     return;
   }
-  const body = await notion.fetchPageBody(notionId);
+  const body = await notion.fetchPageBody(notionId, config.LOCAL_ROOT);
   writeLocal(relPath, { notion_id: notionId, ...fields, body });
   stateLib.setEntry(state, notionId, {
     path:               relPath,

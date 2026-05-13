@@ -1,6 +1,8 @@
 'use strict';
+const crypto = require('crypto');
 const fs    = require('fs');
 const https = require('https');
+const path  = require('path');
 const { Client } = require('@notionhq/client');
 const { NotionToMarkdown } = require('notion-to-md');
 const {
@@ -153,15 +155,61 @@ async function fetchLastEditedTime(pageId) {
   return page.last_edited_time;
 }
 
-// Fetch the body of a Notion page as markdown (excluding title)
-async function fetchPageBody(pageId) {
+// Notion image URLs are signed S3 links that expire in ~1 hour.
+// Downloads each image to outputDir/attachments/<hash>.ext and rewrites the src.
+async function downloadAndRewriteImages(body, outputDir) {
+  const notionHosts = ['prod-files-secure.s3', 'amazonaws.com', 'notion.so', 'X-Amz-Expires'];
+  const imgRegex = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+  const replacements = new Map();
+  let match;
+  while ((match = imgRegex.exec(body)) !== null) {
+    const url = match[2];
+    if (replacements.has(url)) continue;
+    if (!notionHosts.some(p => url.includes(p))) continue;
+    const ext = path.extname(url.split('?')[0]) || '.png';
+    const hash = crypto.createHash('md5').update(url).digest('hex').slice(0, 12);
+    const filename = `${hash}${ext}`;
+    const localPath = path.join(outputDir, 'attachments', filename);
+    replacements.set(url, `./attachments/${filename}`);
+    if (!fs.existsSync(localPath)) {
+      try {
+        const data = await new Promise((resolve, reject) => {
+          https.get(url, res => {
+            if (res.statusCode >= 400) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+            res.on('error', reject);
+          }).on('error', reject);
+        });
+        fs.mkdirSync(path.join(outputDir, 'attachments'), { recursive: true });
+        fs.writeFileSync(localPath, data);
+        log.info('Image downloaded', { filename });
+      } catch (err) {
+        log.warn('Image download failed', { url: url.slice(0, 80), err: err.message });
+        replacements.delete(url);
+      }
+    }
+  }
+  if (replacements.size === 0) return body;
+  return body.replace(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, (full, alt, url) => {
+    const local = replacements.get(url);
+    return local ? `![${alt}](${local})` : full;
+  });
+}
+
+// Fetch the body of a Notion page as markdown (excluding title).
+// When outputDir is provided, Notion-hosted images are downloaded to
+// outputDir/attachments/ and their src rewritten to local relative paths.
+async function fetchPageBody(pageId, outputDir) {
   try {
     const mdBlocks = await n2m.pageToMarkdown(pageId);
     const result   = n2m.toMarkdownString(mdBlocks);
     const raw      = typeof result === 'string' ? result : (result.parent || '');
     // Strip leading H1 — notion2md sometimes emits the page title as the first heading
     // Trim first so leading newlines don't prevent the match
-    const body     = raw.trim().replace(/^#[^\n]*\n?/, '').trim();
+    let body = raw.trim().replace(/^#[^\n]*\n?/, '').trim();
+    if (outputDir) body = await downloadAndRewriteImages(body, outputDir);
     return body;
   } catch (err) {
     log.warn('fetchPageBody failed', { pageId, err: err.message });
