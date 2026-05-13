@@ -1,27 +1,44 @@
 'use strict';
 const path = require('path');
 const os   = require('os');
+const fs   = require('fs');
 
-const LOCAL_ROOT  = path.join(os.homedir(), 'notes/todos');
-const ARCHIVE_DIR = path.join(os.homedir(), 'notes/todos/.archive');
-const TOKEN_PATH  = path.join(os.homedir(), '.config/notion/token');
-const STATE_PATH  = path.join(os.homedir(), '.config/notion/todos_sync_state.json');
-const LOG_PATH    = path.join(os.homedir(), 'Library/Logs/todos-notion-sync.log');
-const LOCK_PATH   = '/tmp/todos-notion-sync.lock';
-const KANBAN_PATH = path.join(os.homedir(), 'Documents/AI-projects-personal/kanban.md');
+// Load optional config.json (CONFIG_PATH env var or ./config.json next to the script)
+let fileConfig = {};
+const configFilePath = process.env.CONFIG_PATH || path.join(__dirname, 'config.json');
+if (fs.existsSync(configFilePath)) {
+  try { fileConfig = JSON.parse(fs.readFileSync(configFilePath, 'utf8')); }
+  catch (e) { process.stderr.write(`Warning: could not parse ${configFilePath}: ${e.message}\n`); }
+}
 
-const DB_ID         = 'YOUR_DB_ID';
-const DATA_SOURCE_ID = 'YOUR_DATA_SOURCE_ID';
+// Priority: env var > config.json > hardcoded default
+function c(envKey, jsonKey, fallback) {
+  if (process.env[envKey] !== undefined) return process.env[envKey];
+  if (fileConfig[jsonKey]  !== undefined) return fileConfig[jsonKey];
+  return typeof fallback === 'function' ? fallback() : fallback;
+}
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const pathOf = (...parts) => path.join(os.homedir(), ...parts);
 
-const VALID_STATUSES   = new Set(['Backlog', 'In progress', 'Done']);
-const VALID_HORIZONS   = new Set(['Now', 'Later', '']);
-const VALID_OUTCOMES   = new Set(['Completed', 'Dropped', '']);
-const VALID_CATEGORIES = new Set(['EXAMPLE_CATEGORY_1', 'EXAMPLE_CATEGORY_2']);
+const LOCAL_ROOT  = c('LOCAL_ROOT',               'localRoot',    pathOf('notes/todos'));
+const ARCHIVE_DIR = c('ARCHIVE_DIR',              'archiveDir',   pathOf('notes/todos/.archive'));
+const TOKEN_PATH  = c('NOTION_TOKEN_PATH',        'tokenPath',    pathOf('.config/notion/token'));
+const STATE_PATH  = c('STATE_PATH',               'statePath',    pathOf('.config/notion/todos_sync_state.json'));
+const LOG_PATH    = c('LOG_PATH',                 'logPath',      pathOf('Library/Logs/todos-notion-sync.log'));
+const LOCK_PATH   = c('LOCK_PATH',                'lockPath',     '/tmp/todos-notion-sync.lock');
+const KANBAN_PATH = c('KANBAN_PATH',              'kanbanPath',   pathOf('Documents/AI-projects-personal/kanban.md'));
+const DB_ID       = c('NOTION_DB_ID',             'dbId',         '');
+const DATA_SOURCE_ID = c('NOTION_DATA_SOURCE_ID', 'dataSourceId', '');
 
-// Maps lowercased input → canonical value, so case variants are auto-corrected
-// rather than hard-failing. ABnB, KA, ME etc. are preserved via explicit keys.
+const POLL_INTERVAL_MS = parseInt(c('POLL_INTERVAL_MS', 'pollIntervalMs', 5 * 60 * 1000), 10);
+const TRIGGER_PORT     = parseInt(c('TRIGGER_PORT',     'triggerPort',    9876),            10);
+
+// Enum validation — configurable, with sensible defaults
+const VALID_STATUSES   = new Set(fileConfig.validStatuses   || ['Backlog', 'In progress', 'Done']);
+const VALID_HORIZONS   = new Set(fileConfig.validHorizons   || ['Now', 'Later', '']);
+const VALID_OUTCOMES   = new Set(fileConfig.validOutcomes   || ['Completed', 'Dropped', '']);
+const VALID_CATEGORIES = new Set(fileConfig.validCategories || []);
+
 function buildAliasMap(validSet) {
   return new Map([...validSet].map(v => [v.toLowerCase(), v]));
 }
@@ -33,7 +50,7 @@ const CATEGORY_ALIASES = buildAliasMap(VALID_CATEGORIES);
 
 module.exports = {
   LOCAL_ROOT, ARCHIVE_DIR, TOKEN_PATH, STATE_PATH, LOG_PATH, LOCK_PATH, KANBAN_PATH,
-  DB_ID, DATA_SOURCE_ID, POLL_INTERVAL_MS,
+  DB_ID, DATA_SOURCE_ID, POLL_INTERVAL_MS, TRIGGER_PORT,
   VALID_STATUSES, VALID_HORIZONS, VALID_OUTCOMES, VALID_CATEGORIES,
   STATUS_ALIASES, HORIZON_ALIASES, OUTCOME_ALIASES, CATEGORY_ALIASES,
 };
